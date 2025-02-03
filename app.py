@@ -6,11 +6,13 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import create_retrieval_chain
 from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from dotenv import load_dotenv
 import tempfile
 import time
+from langchain.schema import Document
+from docx import Document as DocxDocument
 
 load_dotenv()
 
@@ -68,7 +70,7 @@ os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
 qa_prompt = ChatPromptTemplate.from_template(
 """
 Answer the questions based on the provided context only.
-Please provide the most accurate response based on the question
+Please provide the most accurate response based on the question through all documents
 <context>
 {context}
 </context>
@@ -79,7 +81,6 @@ Questions:{input}
 summary_prompt = ChatPromptTemplate.from_template(
 """
 Please provide a comprehensive summary of the following document context.
-Focus on the key points and main ideas.
 <context>
 {context}
 </context>
@@ -87,19 +88,36 @@ Focus on the key points and main ideas.
 )
 
 def process_uploaded_file(uploaded_file):
-    # Create a temporary file to store the uploaded PDF
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+    file_name = uploaded_file.name
+    file_extension = file_name.split('.')[-1].lower()
+
+    # Create a temporary file to store the uploaded file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as tmp_file:
         tmp_file.write(uploaded_file.getvalue())
         tmp_path = tmp_file.name
 
-    # Process the PDF file
-    loader = PyPDFLoader(tmp_path)
-    documents = loader.load()
-    
+    # Process different file types
+    if file_extension == 'pdf':
+        loader = PyPDFLoader(tmp_path)
+        documents = loader.load()
+    elif file_extension == 'txt':
+        loader = TextLoader(tmp_path)
+        documents = loader.load()
+    elif file_extension == 'docx':
+        documents = []
+        doc = DocxDocument(tmp_path)
+        for para in doc.paragraphs:
+            # Convert each paragraph into a Document object with a page_content attribute
+            documents.append(Document(page_content=para.text))
+    else:
+        st.error(f"Unsupported file type: {file_extension}")
+        return []
+
     # Clean up the temporary file
     os.unlink(tmp_path)
-    
+
     return documents
+
 
 def vector_embedding(documents):
     with st.spinner("Processing documents..."):
@@ -113,7 +131,7 @@ def vector_embedding(documents):
 llm = ChatGroq(groq_api_key=groq_api_key, model_name="Llama3-8b-8192")
 
 # File uploader
-uploaded_files = st.file_uploader("Upload your PDF documents", type=['pdf'], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Upload your legal documents (PDF, DOCX, TXT, etc.)", type=['pdf', 'txt', 'docx'], accept_multiple_files=True)
 
 if uploaded_files:
     new_files = [f.name for f in uploaded_files if f.name not in st.session_state.processed_files]
