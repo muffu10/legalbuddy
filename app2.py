@@ -3,18 +3,33 @@ import os
 import tempfile
 import time
 import pandas as pd
-from dotenv import load_dotenv
-from langchain_groq import ChatGroq
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.chains import create_retrieval_chain
-from langchain_community.vectorstores import FAISS
-from langchain.document_loaders import PyPDFLoader, UnstructuredWordDocumentLoader, TextLoader, CSVLoader, UnstructuredExcelLoader
-from langchain.schema import Document
-from docx import Document as DocxDocument
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import json
+
+from dotenv import load_dotenv
+
+# LangChain
+from langchain_groq import ChatGroq
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
+
+from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    TextLoader,
+    CSVLoader,
+    UnstructuredExcelLoader
+)
+
+# Google Generative AI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+# DOCX
+from docx import Document as DocxDocument
 
 st.set_page_config(
     page_title="LegalBuddy",
@@ -28,14 +43,20 @@ st.set_page_config(
 )
 
 # Hide Streamlit's default header and footer
+# Customize Streamlit header and footer
 st.markdown("""
     <style>
+        /* Keep header visible so sidebar toggle works */
         header[data-testid="stHeader"] {
-            display: none;
+            background: transparent;
         }
+
+        /* Hide footer */
         footer {
             display: none;
         }
+
+        /* Hide Streamlit menu */
         #MainMenu {
             display: none;
         }
@@ -312,7 +333,7 @@ def process_uploaded_file(uploaded_file):
 
 def vector_embedding(documents):
     with st.spinner("Processing documents..."):
-        st.session_state.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        st.session_state.embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
         st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         st.session_state.final_documents = st.session_state.text_splitter.split_documents(documents)
         st.session_state.vectors = FAISS.from_documents(st.session_state.final_documents, st.session_state.embeddings)
@@ -357,7 +378,7 @@ def convert_to_json(extraction_text):
     return sections
 
 # --------------------------- INITIALIZE LLM ---------------------------
-llm = ChatGroq(groq_api_key=groq_api_key, model_name="Llama3-8b-8192")
+llm = ChatGroq(groq_api_key=groq_api_key, model_name="openai/gpt-oss-120b")
 
 # --------------------------- MAIN APP LAYOUT ---------------------------
 st.markdown("## 👋 Hello! What do you want to know today?")
